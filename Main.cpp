@@ -13,7 +13,9 @@ using namespace std;
 
 extern "C" {
 	// external ASM procedures:
-	void CalculateItemTotal(int price, int qty);
+	void CalculateItemTotal(double price, double qty);
+	void GetNewItemPrice(double p1, double p2);
+	int GetNewItemQty(int q1, int q2);
 
 	// local C++ functions:
 	void writeToFile();
@@ -38,7 +40,10 @@ extern "C" {
 	void purchaseItem();
 	void displayProducts(int &i);
 	int getProductQty(int choice);
-	void getTotalFromAssembly(int total);
+	void displayCart();
+	void addToCart(int uid, string name, double price, int qty);
+	void setItemTotal(double price);
+	int getCartQty(int index);
 }
 
 class Products {
@@ -46,7 +51,7 @@ public:
 	static int nextid;
 	int id;
 	string name;
-	float price;
+	double price;
 	int qty;
 
 	//Default Constructor 
@@ -56,7 +61,7 @@ public:
 	}
 
 	//Parametrized Constructor 
-	Products(string n, float p, int q)
+	Products(string n, double p, int q)
 	{
 		id = ++nextid;
 		name = n;
@@ -64,7 +69,7 @@ public:
 		qty = q;
 	}
 
-	Products(int i, string n, float p, int q)
+	Products(int i, string n, double p, int q)
 	{
 		id = i;
 		name = n;
@@ -144,6 +149,8 @@ vector<Products> cart;
 
 //Customer Username
 string loginUsername = "";
+
+double newItemPrice;
 
 int main() {
 	//writeToFile();
@@ -408,56 +415,157 @@ void purchaseItem() {
 	//7. Display receipt when payment is >= total else display msg need more
 	//8. Store to purchase history
 
-	int i = 0, choice, qty, storedQty;
+	//todo: -1 to proceed with payment
+
+	int choice, qty, storedQty, index;
+	char c;
 	string productChoice = "Enter product to buy: ";
 	string productQty = "Enter quantity to purchase (default is 1): ";
 
-	//displayCart();
-	displayProducts(i);
-
 	do {
-		choice = read_info(productChoice);
+		int i = 0;
+		
+		displayCart();
+		displayProducts(i);
 
-		if (choice > i || choice < 1) {
-			cout << "Please enter product within range [0 - " << i << "]" << endl;
-		}
-		else {
-			storedQty = getProductQty(choice);
+		do {
+			choice = read_info(productChoice);
 
+			if (choice > i || choice < 1) {
+				cout << "Please enter product within range [0 - " << i << "]" << endl;
+			}
+			else {
+				index = choice - 1;
+				storedQty = getProductQty(index);
+				storedQty -= getCartQty(index);
+
+				if (storedQty < 1) {
+					cout << "Sorry this item has no more stock. Please try again later." << endl;
+					purchaseItem();
+					break;
+				}
+			}
+		} while (choice > i || choice < 1);
+
+		do {
 			if (storedQty < 1) {
-				cout << "Sorry this item has no more stock. Please try again later." << endl;
 				purchaseItem();
 				break;
 			}
+
+			qty = read_info(productQty);
+
+			if (qty > storedQty) {
+				cout << "Please enter quantity that is available (Stock count: " << storedQty << ")" << endl;
+			}
+			else if (qty < 1) {
+				cout << "Please enter quantity more than 0." << endl;
+			}
+		} while (qty < 1 || qty > storedQty);
+
+		CalculateItemTotal(arrProd.at(index).price, (double)qty);
+		double itemTotal = newItemPrice;
+
+		cout << "Total: ";
+		cout << itemTotal << endl;
+
+		addToCart(arrProd.at(index).id, arrProd.at(index).name, itemTotal, qty);
+			
+		cout << "Do you want to purchase more item(s) (Y/N)? ";
+		cin >> c;
+			
+		if (c != 'y') {
+			displayPaymentCart();
 		}
-	} while (choice > i || choice < 1);
 
-	do {
-		if (storedQty < 1) {
-			purchaseItem();
-			break;
-		}
-
-		qty = read_info(productQty);
-
-		if (qty > storedQty) {
-			cout << "Please enter quantity that is available (Stock count: " << storedQty << ")" << endl;
-		}
-		else if (qty < 1) {
-			cout << "Please enter quantity more than 0." << endl;
-		}
-	} while (qty < 1 || qty > storedQty);
-
-	CalculateItemTotal(arrProd.at(choice).price, qty);
-
-	//calculate price here from assembly
-	//Products p(arrProd.at(choice).id, arrProd.at(choice).name, arrProd.at(choice).price, qty);
-
-	//cart.push_back(p);
+	} while (tolower(c) == 'y');
 }
 
-void getTotalFromAssembly(int total) {
-	cout << total << endl;
+void displayPaymentCart() {
+	for (Products p : cart) {
+		cout << p.display() << endl;
+	}
+
+	//display total, service tax, etc.. using assembly
+
+	cout << "Proceed with payment (Y/N)? ";
+	char c;
+
+	do {
+		cin >> c;
+		if (tolower(c) != 'y' || tolower(c) != 'n') {
+			cout << "Please enter either Yes (Y) or No (N)" << endl;
+		}
+	} while (tolower(c) != 'y' || tolower(c) != 'n');
+
+	if (c == 'y') {
+		//ask for payment
+	}
+	else {
+		cout << "Purchase cancelled :(" << endl;
+		cart.clear();
+		customerMenu();
+	}
+}
+
+int getCartQty(int index) {
+	for (Products p : cart) {
+		if (p.id == arrProd.at(index).id) {
+			return p.qty;
+		}
+	}
+
+	return 0;
+}
+
+void setItemTotal(double price) {
+	newItemPrice = price;
+}
+
+void addToCart(int uid, string name, double price, int qty) {
+	int i = 0;
+	bool added = false;
+
+	if (cart.size() == 0) {
+		cart.push_back(Products(uid, name, price, qty));
+		return;
+	}
+	else {
+		for (Products p : cart) {
+			if (p.id == uid) {
+				GetNewItemPrice(p.price, price);
+				int newQty = GetNewItemQty(p.qty, qty);
+
+				cart.erase(cart.begin() + i);
+				cart.push_back(Products(uid, name, newItemPrice, newQty));
+
+				return;
+			}
+			i++;
+		}
+
+		if (!added) {
+			cart.push_back(Products(uid, name, price, qty));
+		}
+	}
+}
+
+void displayCart() {
+	if (cart.size() == 0) {
+		cout << "Cart is empty." << endl;
+	}
+	else {
+		cout << endl;
+		cout << "Name\t\tPrice\t\tQuantity" << endl;
+
+		for (Products p : cart) {
+			cout << p.name << "\t\t" << p.price << "\t\t" << p.qty << endl;
+		}
+
+		cout << endl;
+		cout << "\nTotal: Not Yet Calculated\n" << endl;
+		// todo: calculate Total From Assembly here by passing all price from cart to assembly as array.
+	}
 }
 
 int getProductQty(int choice) {
