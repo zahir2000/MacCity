@@ -13,12 +13,14 @@ using namespace std;
 
 extern "C" {
 	// external ASM procedures:
+	void CalculateItemTotal(int price, int qty);
 
 	// local C++ functions:
 	void writeToFile();
 	void readFromFile();
 	void displayLogin();
 	int read_int();
+	int read_info(string outputText);
 	void loginChoice(int choice);
 	void customerMenu();
 	void adminMenu();
@@ -33,6 +35,10 @@ extern "C" {
 	bool isDuplicateLogin(string u, string p);
 	void changePassword();
 	void saveNewPassword(string currPass, string newPass);
+	void purchaseItem();
+	void displayProducts(int &i);
+	int getProductQty(int choice);
+	void getTotalFromAssembly(int total);
 }
 
 class Products {
@@ -46,15 +52,21 @@ public:
 	//Default Constructor 
 	Products()
 	{
-		id = nextid;
-		nextid++;
+		id = ++nextid;
 	}
 
 	//Parametrized Constructor 
 	Products(string n, float p, int q)
 	{
-		id = nextid;
-		++nextid;
+		id = ++nextid;
+		name = n;
+		price = p;
+		qty = q;
+	}
+
+	Products(int i, string n, float p, int q)
+	{
+		id = i;
 		name = n;
 		price = p;
 		qty = q;
@@ -65,6 +77,12 @@ public:
 		string strprice = to_string(price);
 		string strqty = to_string(qty);
 		return strid + "\t" + name + "\t" + strprice + "\t" + strqty + "\n";
+	}
+
+	string display() {
+		string strprice = to_string(price);
+		string strqty = to_string(qty);
+		return name + "\t" + strprice + "\t" + strqty + "\n";
 	}
 
 	friend ostream & operator << (ostream &out, const Products &obj)
@@ -118,8 +136,13 @@ public:
 
 int Products::nextid = 1;
 
-vector<Products> arr;
+vector<Products> arrProd;
 vector<Customer> custArr;
+
+//Customer cart
+vector<Products> cart;
+
+//Customer Username
 string loginUsername = "";
 
 int main() {
@@ -223,6 +246,10 @@ void custLogin() {
 				break;
 			}
 			else {
+				//HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+				//int k = 12;
+				//SetConsoleTextAttribute(hConsole, k);
+
 				cout << endl;
 				cout << "\nInvalid username and/or password." << endl;
 				cout << "You have " << (3 - counter) << " attempts left" << endl;
@@ -371,6 +398,79 @@ void custChoice(int choice) {
 	}
 }
 
+void purchaseItem() {
+	//1. Display item
+	//2. Select product
+	//3. Select qty
+	//4. Check if storedQty > qty
+	//5. Calculate subtotal and ask if have more item to purchase
+	//6. If no, go to payment (display total with all tax and shit)
+	//7. Display receipt when payment is >= total else display msg need more
+	//8. Store to purchase history
+
+	int i = 0, choice, qty, storedQty;
+	string productChoice = "Enter product to buy: ";
+	string productQty = "Enter quantity to purchase (default is 1): ";
+
+	//displayCart();
+	displayProducts(i);
+
+	do {
+		choice = read_info(productChoice);
+
+		if (choice > i || choice < 1) {
+			cout << "Please enter product within range [0 - " << i << "]" << endl;
+		}
+		else {
+			storedQty = getProductQty(choice);
+
+			if (storedQty < 1) {
+				cout << "Sorry this item has no more stock. Please try again later." << endl;
+				purchaseItem();
+				break;
+			}
+		}
+	} while (choice > i || choice < 1);
+
+	do {
+		if (storedQty < 1) {
+			purchaseItem();
+			break;
+		}
+
+		qty = read_info(productQty);
+
+		if (qty > storedQty) {
+			cout << "Please enter quantity that is available (Stock count: " << storedQty << ")" << endl;
+		}
+		else if (qty < 1) {
+			cout << "Please enter quantity more than 0." << endl;
+		}
+	} while (qty < 1 || qty > storedQty);
+
+	CalculateItemTotal(arrProd.at(choice).price, qty);
+
+	//calculate price here from assembly
+	//Products p(arrProd.at(choice).id, arrProd.at(choice).name, arrProd.at(choice).price, qty);
+
+	//cart.push_back(p);
+}
+
+void getTotalFromAssembly(int total) {
+	cout << total << endl;
+}
+
+int getProductQty(int choice) {
+	return arrProd.at(choice).qty;
+}
+
+void displayProducts(int &i) {
+	for (Products p : arrProd) {
+		i++;
+		cout << i << ". " << p.display();
+	}
+}
+
 void displayCustMenu() {
 	cout << "Customer" << endl;
 	cout << "1. Purchase Item\n2. Purchase History\n3. Change Password\n4. Logout" << endl;
@@ -485,9 +585,30 @@ int read_int(){
 	return (input);
 }
 
+int read_info(string outputText) {
+	int input = -1;
+	bool valid = false;
+
+	do
+	{
+		cout << outputText << flush;
+		cin >> input;
+		if (cin.good()) {
+			valid = true;
+		}
+		else {
+			cin.clear();
+			cin.ignore((numeric_limits<streamsize>::max)(), '\n');
+			cout << "Invalid input; please re-enter choice.\n" << endl;
+		}
+	} while (!valid);
+
+	return (input);
+}
+
 void writeToFile() {
-	arr.push_back(Products("iPhone 11", 800, 12));
-	arr.push_back(Products("iPhone 10", 800, 12));
+	arrProd.push_back(Products("iPhone 11", 800, 12));
+	arrProd.push_back(Products("iPhone 10", 800, 12));
 
 	ofstream out("Products.txt");
 
@@ -496,7 +617,7 @@ void writeToFile() {
 		return;
 	}
 
-	for (Products p : arr) {
+	for (Products p : arrProd) {
 		out << p;
 	}
 
@@ -515,7 +636,7 @@ void readFromFile() {
 
 	while (in >> p) {
 		p.name = regex_replace(p.name, regex{ "_" }, string{ " " });
-		arr.push_back(p);
+		arrProd.push_back(p);
 	}
 
 	in.close();
