@@ -5,7 +5,11 @@
 #include <fstream>
 #include <cassert>
 #include <regex>
+#include <conio.h>
+#include <windows.h>
 using namespace std;
+
+#define MAX_LENGTH 16
 
 extern "C" {
 	// external ASM procedures:
@@ -27,6 +31,8 @@ extern "C" {
 	bool checkCustLogin(string username, string pass);
 	bool registerCust(string username, string pass);
 	bool isDuplicateLogin(string u, string p);
+	void changePassword();
+	void saveNewPassword(string currPass, string newPass);
 }
 
 class Products {
@@ -112,13 +118,25 @@ public:
 
 int Products::nextid = 1;
 
-std::vector<Products> arr;
+vector<Products> arr;
+vector<Customer> custArr;
+string loginUsername = "";
 
 int main() {
 	//writeToFile();
 	readFromFile();
 
 	cout << "MacCity" << endl;
+
+	/*
+	cout << "  []        []	[][][][][][] [][][][][][]" << endl;
+	cout << "  [][]    [][]	[]        [] []          " << endl;
+	cout << "  []  [][]  []	[]        [] []          " << endl;
+	cout << "  []   []   []	[][][][][][] []          " << endl;
+	cout << "  []        []	[]        [] []          " << endl;
+	cout << "  []        []	[]        [] []          " << endl;
+	cout << "  []        []	[]        [] [][][][][][]" << endl;
+	*/
 
 	int choice;
 	do {
@@ -166,6 +184,7 @@ void custLoginChoice(int choice) {
 }
 
 void custLogin() {
+	char keypressed;
 	string username, pass;
 	int counter = 0;
 
@@ -175,23 +194,44 @@ void custLogin() {
 		cin >> username;
 
 		cout << "Enter Password: ";
-		cin >> pass;
+		pass = "";
 
+		for (;;) {
+			keypressed = NULL;
+			keypressed = _getch();
+
+			if (pass.size() < MAX_LENGTH && ((keypressed >= 60 && keypressed <= 90) || (keypressed >= 97 && keypressed <= 122) || (keypressed >= 48 && keypressed <= 57) || keypressed == 32)) {
+				pass.push_back(keypressed);
+				cout << "*";
+			}
+
+			else if (pass.size() > 0 && keypressed == 8) {
+				pass.erase(pass.length() - 1);
+				cout << "\b \b";
+			}
+
+			else if (keypressed == 13) 
+				break;
+		}
+			
 		counter++;
 
-		if (checkCustLogin(username, pass)) {
-			customerMenu();
-			break;
-		}
-		else {
-			cout << "\nInvalid username and/or password." << endl;
-			cout << "You have " << (3 - counter) << " attempts left" << endl;
-			cout << endl;
-		}
+			if (checkCustLogin(username, pass)) {
+				cout << endl;
+				loginUsername = username;
+				customerMenu();
+				break;
+			}
+			else {
+				cout << endl;
+				cout << "\nInvalid username and/or password." << endl;
+				cout << "You have " << (3 - counter) << " attempts left" << endl;
+				cout << endl;
+			}
 
-		if (counter == 3) {
-			cout << "You have exceeded number of login attempts. Returning to Customer Menu." << endl;
-		}
+			if (counter == 3) {
+				cout << "You have exceeded number of login attempts. Returning to Customer Menu." << endl;
+			}
 	}
 }
 
@@ -313,7 +353,7 @@ void customerMenu() {
 void custChoice(int choice) {
 	switch (choice) {
 	case 1:
-		//purchaseItem();
+		purchaseItem();
 		break;
 
 	case 2:
@@ -321,11 +361,12 @@ void custChoice(int choice) {
 		break;
 
 	case 3:
-		//changePassword();
+		changePassword();
 		break;
 
 	case 4:
-		//exit
+		//Logout
+		//Don't forget to set loginUsername to null
 		break;
 	}
 }
@@ -333,6 +374,85 @@ void custChoice(int choice) {
 void displayCustMenu() {
 	cout << "Customer" << endl;
 	cout << "1. Purchase Item\n2. Purchase History\n3. Change Password\n4. Logout" << endl;
+}
+
+void changePassword() {
+	string currPass, pass, pass2;
+
+	if (loginUsername.length() == 0) {
+		custDisplayLogin();
+	}
+
+	cout << "Change Password for " << loginUsername << endl;
+	cout << "Enter current password: ";
+	cin >> currPass;
+
+	if (checkCustLogin(loginUsername, currPass)) {
+		
+		do {
+
+			cout << "Enter new password: ";
+			cin >> pass;
+
+			if (pass.length() < 4) {
+				cerr << "Password must be more than 3 characters." << endl;
+			}
+
+		} while (pass.length() < 4);
+
+		cout << "Re-enter new password: ";
+		cin >> pass2;
+
+		if (pass.compare(pass2) == 0) {
+			saveNewPassword(currPass, pass);
+			cout << "Password has been successfully changed :)" << endl;
+		}
+		else {
+			cerr << "Passwords don't match. Please try again." << endl;
+		}
+	}
+	else {
+		cerr << "Incorrect current password." << endl;
+	}
+}
+
+void saveNewPassword(string currPass, string newPass) {
+
+	ifstream in("Customer.txt");
+
+	if (!in) {
+		cerr << "Error in opening the file" << endl;
+		return;
+	}
+
+	Customer c;
+
+	while (in >> c) {
+		if (currPass.compare(c.password) == 0 && loginUsername.compare(c.username) == 0) {
+			c.password = newPass;
+			custArr.push_back(c);
+		}
+		else {
+			custArr.push_back(c);
+		}
+	}
+
+	in.close();
+
+	ofstream out("Customer.txt");
+
+	if (!out) {
+		cerr << "Error in opening the file" << endl;
+		return;
+	}
+
+	for (Customer c : custArr) {
+		out << c;
+	}
+
+	custArr.clear();
+
+	out.close();
 }
 
 void adminMenu() {
@@ -357,7 +477,7 @@ int read_int(){
 		}
 		else{
 			cin.clear();
-			cin.ignore(numeric_limits<streamsize>::max(), '\n');
+			cin.ignore((numeric_limits<streamsize>::max)(), '\n');
 			cout << "Invalid input; please re-enter choice.\n" << endl;
 		}
 	} while (!valid);
