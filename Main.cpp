@@ -7,6 +7,9 @@
 #include <regex>
 #include <conio.h>
 #include <windows.h>
+#include <array>
+#include <chrono>
+#include <time.h>
 using namespace std;
 
 #define MAX_LENGTH 16
@@ -16,6 +19,9 @@ extern "C" {
 	void CalculateItemTotal(double price, double qty);
 	void GetNewItemPrice(double p1, double p2);
 	int GetNewItemQty(int q1, int q2);
+	void CalculateSubTotal(int len, array<double, 100> total);
+	void DisplayPaymentCart(double sst, double sch, double total);
+	void CalculateTotal(double totalAllItems);
 
 	// local C++ functions:
 	void writeToFile();
@@ -41,9 +47,23 @@ extern "C" {
 	void displayProducts(int &i);
 	int getProductQty(int choice);
 	void displayCart();
-	void addToCart(int uid, string name, double price, int qty);
+	void addToCart(int uid, string name, int qty, double price, double totalPrice);
 	void setItemTotal(double price);
 	int getCartQty(int index);
+	void SetSubTotal(double total);
+	void findSubTotal();
+	void displayPaymentOptions();
+	int read_int_no_cout();
+	void displayReceipt(string paymentOpt);
+	void displayEqualLine();
+	void printDashLine();
+	void ClearScreen();
+	void writePurchaseHistory(string paymentOpt, string orderDate);
+	void updateQty(int mId, int mQty);
+	void updateProductQty();
+	void writeNewQty();
+	void purchaseHistory();
+	string getProductName(int id);
 }
 
 class Products {
@@ -112,6 +132,71 @@ public:
 	}
 };
 
+class Cart {
+public:
+	int id;
+	string name;
+	int qty;
+	double unitPrice;
+	double totalPrice;
+
+	Cart(int mId, string mName, int mQty, double mUnitPrice, double mTotalPrice)
+	{
+		id = mId;
+		name = mName;
+		qty = mQty;
+		unitPrice = mUnitPrice;
+		totalPrice = mTotalPrice;
+	}
+};
+
+class PurchaseHistory {
+public:
+	string username;
+	int id;
+	int qty;
+	double totalPayment;
+	string paymentOption;
+	string paymentDate;
+
+	PurchaseHistory(){}
+
+	PurchaseHistory(string s, int i, int q, double t, string pO, string pD) {
+		username = s;
+		id = i;
+		qty = q;
+		totalPayment = t;
+		paymentOption = pO;
+		paymentDate = pD;
+	}
+
+	friend ostream & operator << (ostream &out, const PurchaseHistory &obj)
+	{
+		out << obj.username << "\n";
+		out << obj.id << "\n";
+		out << obj.qty << "\n";
+		out << obj.totalPayment << "\n";
+
+		string s = obj.paymentOption;
+		s = regex_replace(s, regex{ " " }, string{ "_" });
+
+		out << s;
+		out << "\n" << obj.paymentDate << endl;
+		return out;
+	}
+
+	friend istream & operator >> (istream &in, PurchaseHistory &obj)
+	{
+		in >> obj.username;
+		in >> obj.id;
+		in >> obj.qty;
+		in >> obj.totalPayment;
+		in >> obj.paymentOption;
+		in >> obj.paymentDate;
+		return in;
+	}
+};
+
 class Customer {
 public:
 	string username;
@@ -145,12 +230,17 @@ vector<Products> arrProd;
 vector<Customer> custArr;
 
 //Customer cart
-vector<Products> cart;
+vector<Cart> arrCart;
+//vector<Products> cart;
 
 //Customer Username
 string loginUsername = "";
 
-double newItemPrice;
+double newItemPrice = 0.0;
+double totalAllItems = 0;
+
+//Cart Variables
+double cartSST, cartSCH, cartTotal;
 
 int main() {
 	//writeToFile();
@@ -331,6 +421,8 @@ bool registerCust(string username, string pass) {
 	out << c;
 
 	out.close();
+	
+	return true;
 }
 
 bool isDuplicateLogin(string u, string p) {
@@ -387,11 +479,13 @@ void customerMenu() {
 void custChoice(int choice) {
 	switch (choice) {
 	case 1:
+		cout.setf(ios::fixed, ios::floatfield);
+		cout << setprecision(2);
 		purchaseItem();
 		break;
 
 	case 2:
-		//purchaseHistory();
+		purchaseHistory();
 		break;
 
 	case 3:
@@ -399,8 +493,10 @@ void custChoice(int choice) {
 		break;
 
 	case 4:
-		//Logout
-		//Don't forget to set loginUsername to null
+		loginUsername = "";
+		cout << "\nYou have been successfuly logged out.\n" << endl;
+		system("pause");
+		ClearScreen();
 		break;
 	}
 }
@@ -419,13 +515,15 @@ void purchaseItem() {
 
 	int choice, qty, storedQty, index;
 	char c;
-	string productChoice = "Enter product to buy: ";
-	string productQty = "Enter quantity to purchase (default is 1): ";
+	string productChoice = "Enter product to buy >> ";
+	string productQty = "Enter quantity to purchase >> ";
 
 	do {
 		int i = 0;
 		
+		ClearScreen();
 		displayCart();
+		printf("\n\n");
 		displayProducts(i);
 
 		do {
@@ -466,50 +564,365 @@ void purchaseItem() {
 		CalculateItemTotal(arrProd.at(index).price, (double)qty);
 		double itemTotal = newItemPrice;
 
-		cout << "Total: ";
-		cout << itemTotal << endl;
+		//cout << "Total: ";
+		//cout << itemTotal << endl;
 
-		addToCart(arrProd.at(index).id, arrProd.at(index).name, itemTotal, qty);
+		addToCart(arrProd.at(index).id, arrProd.at(index).name, qty, arrProd.at(index).price, itemTotal);
 			
-		cout << "Do you want to purchase more item(s) (Y/N)? ";
+		cout << "\nDo you want to purchase more item(s)? [Y/N] >> ";
 		cin >> c;
 			
 		if (c != 'y') {
-			displayPaymentCart();
+			findSubTotal();
+			cout << setprecision(3);
+			CalculateTotal(totalAllItems);
 		}
 
 	} while (tolower(c) == 'y');
 }
 
-void displayPaymentCart() {
-	for (Products p : cart) {
-		cout << p.display() << endl;
+void purchaseHistory() {
+	//READ PurchaseHistory.txt
+	//Check which entries match loginUsername
+	//Display those..
+
+	vector<PurchaseHistory> arrPh;
+	int counter = 0;
+
+	ifstream in("PurchaseHistory.txt");
+
+	if (!in) {
+		cerr << "Error in opening the file" << endl;
+		return;
 	}
 
-	//display total, service tax, etc.. using assembly
+	PurchaseHistory p;
 
-	cout << "Proceed with payment (Y/N)? ";
+	while (in >> p) {
+		p.paymentOption = regex_replace(p.paymentOption, regex{ "_" }, string{ " " });
+		arrPh.push_back(p);
+	}
+
+	in.close();
+
+	for (PurchaseHistory ph : arrPh) {
+		if (ph.username.compare(loginUsername) == 0) {
+			counter++;
+
+			if (counter == 1) {
+				ClearScreen();
+				displayEqualLine();
+				printf("\n%35s %-25s\n", "PURCHASE HISTORY", "");
+				displayEqualLine();
+				cout << endl;
+				printf("%-18s %-5s %-18s %-18s\n", "Name", "Qty", "Unit Price (RM)", "Total Price (RM)");
+				printDashLine();
+				cout << endl;
+			}
+
+			cout << setw(20) << left << getProductName(ph.id) << setw(9) << left << ph.qty
+				<< left << setw(22) << ph.totalPayment << setw(20) << left << ph.paymentDate << ph.paymentOption << endl;
+		}
+	}
+
+	cout << endl;
+	printDashLine();
+	cout << endl;
+
+	if (counter == 0) {
+		//no orders for this guy
+	}
+}
+
+string getProductName(int id) {
+	for (Products p : arrProd) {
+		if (id == p.id) {
+			return p.name;
+		}
+	}
+
+	return "";
+}
+
+void displayCartWithTotal(double sst, double sch, double total) {
+	ClearScreen();
+
+	displayEqualLine();
+	printf("\n%35s %-25s\n", "USER CART", "");
+	displayEqualLine();
+	cout << endl;
+
+	printf("%-18s %-5s %-18s %-18s\n", "Name", "Qty", "Unit Price (RM)", "Total Price (RM)");
+	printDashLine();
+	cout << endl;
+
+	if (arrCart.size() == 0) {
+		cout << "Cart is empty." << endl;
+	}
+	else {
+		findSubTotal();
+
+		cout << endl;
+
+		for (Cart p : arrCart) {
+			cout << setw(20) << left << p.name << setw(9) << left << p.qty
+				<< left << setw(22) << p.unitPrice << setw(20) << left << p.totalPrice << endl;
+		}
+
+		cout << endl;
+
+		printDashLine();
+
+		cout << endl;
+
+		cout << setw(51) << right << "SUBTOTAL: " << totalAllItems << endl;
+	}
+
+	displayEqualLine();
+	cout << endl;
+
+	cout << setw(52) << right << "SST (6%): " << sst << endl;
+	cout << setw(52) << right << "SC (10%): " << sch << endl;
+
+	for (int z = 0; z < 60; z++) {
+		printf("-");
+	}
+	cout << endl;
+
+	cout << setw(51) << right << "TOTAL: " << total << endl;
+
+	displayEqualLine();
+
+	cout << endl;
+}
+
+void setSST(double sst) {
+	cartSST = sst;
+}
+
+void setSCH(double sch) {
+	cartSCH = sch;
+}
+
+void setCartTotal(double total) {
+	cartTotal = total;
+}
+
+//Starts from Assembly
+void DisplayPaymentCart(double sst, double sch, double total) {
+	displayCartWithTotal(sst, sch, total);
+
+	setSST(sst);
+	setSCH(sch);
+	setCartTotal(total);
+
+	//Maybe Shipping Fee & Discount
+
 	char c;
 
 	do {
+		cout << "\nProceed with payment? [Y/N] >> ";
 		cin >> c;
-		if (tolower(c) != 'y' || tolower(c) != 'n') {
-			cout << "Please enter either Yes (Y) or No (N)" << endl;
+		if (tolower(c) != 'y' && tolower(c) != 'n') {
+			cout << "Please enter either [Y (Yes) / N (No)]" << endl;
 		}
-	} while (tolower(c) != 'y' || tolower(c) != 'n');
+	} while (tolower(c) != 'y' && tolower(c) != 'n');
 
 	if (c == 'y') {
-		//ask for payment
+		displayPaymentOptions();
 	}
 	else {
 		cout << "Purchase cancelled :(" << endl;
-		cart.clear();
+		arrCart.clear();
 		customerMenu();
 	}
 }
 
+void displayPaymentOptions() {
+	ClearScreen();
+	
+	displayEqualLine();
+	printf("\n%38s %-22s\n", "PAYMENT OPTIONS", "");
+	displayEqualLine();
+	cout << endl;
+
+	cout << "1. Cash on Delivery" << endl;
+	cout << "2. Credit Card" << endl;
+	displayEqualLine();
+	cout << endl;
+
+	int option;
+	string paymentOpt;
+
+	do {
+		cout << "Enter your payment option >> ";
+		option = read_int_no_cout();
+
+		if (option != 1 && option != 2) {
+			cerr << "Please input between option [1 - 2]\n\n";
+		}
+	} while (option != 1 && option != 2);
+
+	switch (option) {
+	case 1: 
+		paymentOpt = "Cash on Delivery";
+		break;
+
+	case 2:
+		paymentOpt = "Credit Card";
+		break;
+	}
+
+	displayReceipt(paymentOpt);
+	//DisplayReceipt
+	//Store everything to PurchaseHistory
+	//Store PurchaseHistory to FILE
+}
+
+void displayReceipt(string paymentOpt) {
+	string orderDate;
+
+	ClearScreen();
+
+	displayEqualLine();
+	printf("\n%30s %-30s\n", "RECEIPT", "");
+	displayEqualLine();
+	cout << endl;
+
+	//user detail here
+
+	auto end = chrono::system_clock::now();
+	time_t end_time = chrono::system_clock::to_time_t(end);
+	char buffer[80];
+	struct tm timeinfo;
+	time(&end_time);
+	localtime_s(&timeinfo, &end_time);
+
+	cout << "\nPayment by: " << loginUsername << endl;
+	cout << "Order date: ";
+	strftime(buffer, 80, "%d/%m/%Y", &timeinfo);
+	puts(buffer);
+	orderDate = buffer;
+
+	cout << "Payment option: " << paymentOpt << endl;
+	
+	cout << endl;
+
+	printf("%35s %-25s\n", "ORDER DETAILS", "");
+
+	printDashLine();
+	cout << endl;
+
+	printf("%-18s %-5s %-18s %-18s\n", "Name", "Qty", "Unit Price (RM)", "Total Price (RM)");
+
+	printDashLine();
+
+	cout << endl;
+
+	findSubTotal();
+
+	cout << endl;
+
+	for (Cart p : arrCart) {
+		cout << setw(20) << left << p.name << setw(9) << left << p.qty
+			<< left << setw(22) << p.unitPrice << setw(20) << left << p.totalPrice << endl;
+	}
+
+	cout << endl;
+
+	printDashLine();
+
+	cout << endl;
+
+	cout << setw(51) << right << "SUBTOTAL: " << totalAllItems << endl;
+
+	printDashLine();
+	cout << endl;
+
+	cout << setw(52) << right << "SST (6%): " << cartSST << endl;
+	cout << setw(52) << right << "SC (10%): " << cartSCH << endl;
+
+	for (int z = 0; z < 60; z++) {
+		printf("-");
+	}
+
+	cout << endl;
+	cout << setw(51) << right << "TOTAL: " << cartTotal << endl;
+	displayEqualLine();
+	cout << endl;
+
+	writePurchaseHistory(paymentOpt, orderDate);
+}
+
+void writePurchaseHistory(string paymentOpt, string orderDate) {
+	vector<PurchaseHistory> arrPH;
+
+	for (Cart c : arrCart) {
+		arrPH.push_back(PurchaseHistory(loginUsername, c.id, c.qty, c.totalPrice, paymentOpt, orderDate));
+	}
+
+	ofstream out("PurchaseHistory.txt", ios::app);
+
+	if (!out) {
+		cerr << "Error in opening the file" << endl;
+		return;
+	}
+
+	for (PurchaseHistory p : arrPH) {
+		out << p;
+	}
+
+	out.close();
+
+	updateProductQty();
+}
+
+void updateProductQty() {
+	for (Cart c : arrCart) {
+		updateQty(c.id, c.qty);
+	}
+	
+	arrCart.clear();
+
+	cout << "\n" << endl;
+	system("pause");
+
+	ClearScreen();
+	customerMenu();
+}
+
+void updateQty(int mId, int mQty) {
+	int i = -1;
+
+	for (Products p : arrProd) {
+		++i;
+		if (mId == p.id) {
+			//DO IT IN ASSEMBLY
+			p.qty = p.qty - mQty;
+			arrProd.at(i).qty = p.qty;
+		}
+	}
+
+	writeNewQty();
+}
+
+void writeNewQty() {
+	ofstream out("Products.txt");
+
+	if (!out) {
+		cerr << "Error in opening the file" << endl;
+		return;
+	}
+
+	for (Products p : arrProd) {
+		out << p;
+	}
+
+	out.close();
+}
+
 int getCartQty(int index) {
-	for (Products p : cart) {
+	for (Cart p : arrCart) {
 		if (p.id == arrProd.at(index).id) {
 			return p.qty;
 		}
@@ -522,22 +935,25 @@ void setItemTotal(double price) {
 	newItemPrice = price;
 }
 
-void addToCart(int uid, string name, double price, int qty) {
+void addToCart(int uid, string name, int qty, double price, double totalPrice) {
 	int i = 0;
 	bool added = false;
 
-	if (cart.size() == 0) {
-		cart.push_back(Products(uid, name, price, qty));
+	if (arrCart.size() == 0) {
+		//cart.push_back(Products(uid, name, price, qty));
+		arrCart.push_back(Cart(uid, name, qty, price, totalPrice));
 		return;
 	}
 	else {
-		for (Products p : cart) {
+		for (Cart p : arrCart) {
 			if (p.id == uid) {
-				GetNewItemPrice(p.price, price);
+				GetNewItemPrice(p.totalPrice, totalPrice);
 				int newQty = GetNewItemQty(p.qty, qty);
 
-				cart.erase(cart.begin() + i);
-				cart.push_back(Products(uid, name, newItemPrice, newQty));
+				arrCart.erase(arrCart.begin() + i);
+				arrCart.push_back(Cart(uid, name, newQty, price, newItemPrice));
+				//cart.erase(cart.begin() + i);
+				//cart.push_back(Products(uid, name, newItemPrice, newQty));
 
 				return;
 			}
@@ -545,27 +961,76 @@ void addToCart(int uid, string name, double price, int qty) {
 		}
 
 		if (!added) {
-			cart.push_back(Products(uid, name, price, qty));
+			arrCart.push_back(Cart(uid, name, qty, price, totalPrice));
+			//cart.push_back(Products(uid, name, price, qty));
 		}
 	}
 }
 
 void displayCart() {
-	if (cart.size() == 0) {
+	displayEqualLine();
+
+	printf("\n%35s %-25s\n", "USER CART", "");
+
+	displayEqualLine();
+
+	cout << endl;
+	printf("%-18s %-5s %-18s %-18s\n", "Name", "Qty", "Unit Price (RM)", "Total Price (RM)");
+
+	printDashLine();
+
+	cout << endl;
+
+	if (arrCart.size() == 0) {
 		cout << "Cart is empty." << endl;
 	}
 	else {
-		cout << endl;
-		cout << "Name\t\tPrice\t\tQuantity" << endl;
+		findSubTotal();
 
-		for (Products p : cart) {
-			cout << p.name << "\t\t" << p.price << "\t\t" << p.qty << endl;
+		for (Cart p : arrCart) {
+			cout << setw(20) << left << p.name << setw(9) << left << p.qty
+				<< left << setw(22) << p.unitPrice << setw(20) << left << p.totalPrice << endl;
 		}
 
 		cout << endl;
-		cout << "\nTotal: Not Yet Calculated\n" << endl;
-		// todo: calculate Total From Assembly here by passing all price from cart to assembly as array.
+
+		printDashLine();
+
+		cout << endl;
+
+		cout << setw(51) << right << "SUBTOTAL: " << totalAllItems << endl;
 	}
+
+	displayEqualLine();
+	cout << endl;
+}
+
+void printDashLine() {
+	for (int z = 0; z < 60; z++) {
+		printf("-");
+	}
+}
+
+void findSubTotal() {
+	int i = -1;
+	array<double, 100> total;
+
+	for (Cart p : arrCart) {
+		i++;
+		total[i] = p.totalPrice;
+	}
+
+	CalculateSubTotal(++i, total);
+}
+
+void displayEqualLine() {
+	for (int z = 0; z < 60; z++) {
+		printf("=");
+	}
+}
+
+void SetSubTotal(double total) {
+	totalAllItems = total;
 }
 
 int getProductQty(int choice) {
@@ -573,10 +1038,22 @@ int getProductQty(int choice) {
 }
 
 void displayProducts(int &i) {
+	displayEqualLine();
+	printf("\n%35s %-25s\n", "PRODUCTS", "");
+	displayEqualLine();
+	cout << endl;
+	printf("%-2s %-28s %-16s %-16s\n", "", "Name", "Price", "Stock Count");
+	printDashLine();
+	cout << endl;
+
 	for (Products p : arrProd) {
 		i++;
-		cout << i << ". " << p.display();
+		cout << i << ". ";
+		cout << setw(25) << left << p.name << setw(10) << right << p.price
+			<< right << setw(18) << p.qty << endl;
 	}
+
+	displayEqualLine();	cout << endl;
 }
 
 void displayCustMenu() {
@@ -687,6 +1164,28 @@ int read_int(){
 			cin.clear();
 			cin.ignore((numeric_limits<streamsize>::max)(), '\n');
 			cout << "Invalid input; please re-enter choice.\n" << endl;
+			//Tell them to enter integer only
+		}
+	} while (!valid);
+
+	return (input);
+}
+
+int read_int_no_cout() {
+	int input = -1;
+	bool valid = false;
+
+	do
+	{
+		cin >> input;
+		if (cin.good()) {
+			valid = true;
+		}
+		else {
+			cin.clear();
+			cin.ignore((numeric_limits<streamsize>::max)(), '\n');
+			cout << "Please input integer only.\n" << endl;
+			cout << "Enter your payment option >> ";
 		}
 	} while (!valid);
 
@@ -748,4 +1247,40 @@ void readFromFile() {
 	}
 
 	in.close();
+}
+
+void ClearScreen(){
+	HANDLE                     hStdOut;
+	CONSOLE_SCREEN_BUFFER_INFO csbi;
+	DWORD                      count;
+	DWORD                      cellCount;
+	COORD                      homeCoords = { 0, 0 };
+
+	hStdOut = GetStdHandle(STD_OUTPUT_HANDLE);
+	if (hStdOut == INVALID_HANDLE_VALUE) return;
+
+	/* Get the number of cells in the current buffer */
+	if (!GetConsoleScreenBufferInfo(hStdOut, &csbi)) return;
+	cellCount = csbi.dwSize.X *csbi.dwSize.Y;
+
+	/* Fill the entire buffer with spaces */
+	if (!FillConsoleOutputCharacter(
+		hStdOut,
+		(TCHAR) ' ',
+		cellCount,
+		homeCoords,
+		&count
+	)) return;
+
+	/* Fill the entire buffer with the current colors and attributes */
+	if (!FillConsoleOutputAttribute(
+		hStdOut,
+		csbi.wAttributes,
+		cellCount,
+		homeCoords,
+		&count
+	)) return;
+
+	/* Move the cursor home */
+	SetConsoleCursorPosition(hStdOut, homeCoords);
 }
