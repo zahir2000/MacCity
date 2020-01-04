@@ -22,6 +22,8 @@ extern "C" {
 	void CalculateSubTotal(int len, array<double, 100> total);
 	void DisplayPaymentCart(double sst, double sch, double total);
 	void CalculateTotal(double totalAllItems);
+	int MinusOne(int intVal);
+	int GetMinusTwoVal(int val1, int val2);
 
 	// local C++ functions:
 	void writeToFile();
@@ -64,6 +66,7 @@ extern "C" {
 	void writeNewQty();
 	void purchaseHistory();
 	string getProductName(int id);
+	void displayPhHeaders();
 }
 
 class Products {
@@ -242,26 +245,27 @@ double totalAllItems = 0;
 //Cart Variables
 double cartSST, cartSCH, cartTotal;
 
+HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+
 int main() {
 	//writeToFile();
 	readFromFile();
 
-	cout << "MacCity" << endl;
-
-	/*
-	cout << "  []        []	[][][][][][] [][][][][][]" << endl;
-	cout << "  [][]    [][]	[]        [] []          " << endl;
-	cout << "  []  [][]  []	[]        [] []          " << endl;
-	cout << "  []   []   []	[][][][][][] []          " << endl;
-	cout << "  []        []	[]        [] []          " << endl;
-	cout << "  []        []	[]        [] []          " << endl;
-	cout << "  []        []	[]        [] [][][][][][]" << endl;
-	*/
+	SetConsoleTextAttribute(hConsole, 7);
+	system("color 7");
 
 	int choice;
 	do {
+		displayEqualLine();
+		printf("\n%40s %-20s\n", "WELCOME TO MACCITY", "");
+		displayEqualLine();
+		cout << endl;
 		displayLogin();
+		displayEqualLine();
+		cout << endl << endl;
+
 		choice = read_int();
+
 		loginChoice(choice);
 	} while (choice != 3);
 }
@@ -277,14 +281,30 @@ void loginChoice(int choice) {
 	case 2: 
 		adminMenu();
 		break;
+
+	case 3: break;
+
+	default: 
+		SetConsoleTextAttribute(hConsole, 14);
+		cout << "Please enter choice between [1 - 3]\n" << endl;
+		SetConsoleTextAttribute(hConsole, 7);
+		system("pause");
+		ClearScreen();
 	}
 }
 
 void custDisplayLogin() {
+	ClearScreen();
+
 	int choice;
 	do {
-		cout << "Customer" << endl;
+		displayEqualLine();
+		printf("\n%35s %-25s\n", "CUSTOMER", "");
+		displayEqualLine();
+		cout << endl;
 		cout << "1. Login\n2. Register\n3. Back" << endl;
+		displayEqualLine();
+		cout << endl << endl;
 
 		choice = read_int();
 		custLoginChoice(choice);
@@ -294,12 +314,25 @@ void custDisplayLogin() {
 void custLoginChoice(int choice) {
 	switch (choice) {
 	case 1:
+		ClearScreen();
 		custLogin();
 		break;
 
 	case 2:
+		ClearScreen();
 		custRegister();
 		break;
+	
+	case 3:
+		ClearScreen();
+		break;
+
+	default:
+		SetConsoleTextAttribute(hConsole, 14);
+		cout << "\nPlease enter choice between [1 - 3]\n" << endl;
+		SetConsoleTextAttribute(hConsole, 7);
+		system("pause");
+		ClearScreen();
 	}
 }
 
@@ -309,7 +342,12 @@ void custLogin() {
 	int counter = 0;
 
 	while (counter != 3) {
-		cout << "Customer Login" << endl;
+		displayEqualLine();
+		printf("\n%33s %-32s\n", "LOGIN", "");
+		displayEqualLine();
+		cout << endl;
+
+		//cout << "Customer Login" << endl;
 		cout << "Enter Username: ";
 		cin >> username;
 
@@ -326,7 +364,7 @@ void custLogin() {
 			}
 
 			else if (pass.size() > 0 && keypressed == 8) {
-				pass.erase(pass.length() - 1);
+				pass.erase(MinusOne(pass.length()));
 				cout << "\b \b";
 			}
 
@@ -339,67 +377,125 @@ void custLogin() {
 			if (checkCustLogin(username, pass)) {
 				cout << endl;
 				loginUsername = username;
+				ClearScreen();
 				customerMenu();
 				break;
 			}
 			else {
-				//HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
-				//int k = 12;
-				//SetConsoleTextAttribute(hConsole, k);
+				HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+				SetConsoleTextAttribute(hConsole, 12);
 
 				cout << endl;
-				cout << "\nInvalid username and/or password." << endl;
-				cout << "You have " << (3 - counter) << " attempts left" << endl;
-				cout << endl;
-			}
+				cout  << "\nInvalid username and/or password." << endl;
+				cout << "You have ";
 
-			if (counter == 3) {
-				cout << "You have exceeded number of login attempts. Returning to Customer Menu." << endl;
+				SetConsoleTextAttribute(hConsole, 2);
+				cout << GetMinusTwoVal(3, counter);
+
+				SetConsoleTextAttribute(hConsole, 12);
+				cout << " attempts left" << endl << endl;
+				
+				SetConsoleTextAttribute(hConsole, 7);
+				
+				if (counter == 3) {
+					SetConsoleTextAttribute(hConsole, 4);
+					cout << "You have exceeded number of login attempts.\n";
+					SetConsoleTextAttribute(hConsole, 7);
+					cout << "Returning to Customer Menu.\n" << endl;
+				}
+
+				system("pause");
+				ClearScreen();
 			}
 	}
 }
 
 void custRegister() {
 	string username, pass;
+	char keypressed;
 
-	cout << "Customer Registration" << endl;
-	cout << "Enter -1 to Exit" << endl;
+	displayEqualLine();
+	printf("\n%45s %-15s\n", "REGISTRATION (Enter -1 to Exit)", "");
+	displayEqualLine();
+	cout << endl;
+
 	do {
-		cout << "Enter Username: ";
+		cout << "Enter Username >> ";
 		cin >> username;
 
-		if (username.compare("-1") == 0)
+		if (username.compare("-1") == 0) {
+			ClearScreen();
 			return;
+		}
 
-		if (username.length() < 4)
-			cout << "Username must be more than 3 characters. Please re-enter" << endl;
-
+		if (username.length() < 4) {
+			SetConsoleTextAttribute(hConsole, 4);
+			cout << "\nUsername must be more than 3 characters.\n" << endl;
+			SetConsoleTextAttribute(hConsole, 7);
+		}
 	} while (username.length() < 4);
 
 	do {
-		cout << "Enter Password: ";
-		cin >> pass;
+		cout << "Enter Password >> ";
+		pass = "";
 
-		if (pass.compare("-1") == 0)
+		for (;;) {
+			keypressed = NULL;
+			keypressed = _getch();
+
+			if (pass.size() < MAX_LENGTH && ((keypressed >= 60 && keypressed <= 90) || (keypressed >= 97 && keypressed <= 122) || (keypressed >= 48 && keypressed <= 57) || keypressed == 32)) {
+				pass.push_back(keypressed);
+				cout << "*";
+			}
+
+			else if (pass.size() > 0 && keypressed == 8) {
+				pass.erase(MinusOne(pass.length()));
+				cout << "\b \b";
+			}
+
+			else if (keypressed == 13)
+				break;
+		}
+
+		if (pass.compare("-1") == 0) {
+			ClearScreen();
 			return;
+		}
+			
 
-		if (pass.length() < 4)
-			cout << "Password must be more than 3 characters. Please re-enter" << endl;
+		if (pass.length() < 4) {
+			SetConsoleTextAttribute(hConsole, 4);
+			cout << "\nPassword must be more than 3 characters.\n" << endl;
+			SetConsoleTextAttribute(hConsole, 7);
+		}
 	} while (pass.length() < 4);
 
 	if (registerCust(username, pass)) {
-		cout << "Registration successful" << endl;
-		cout << "Would you like to login (Y/N)?: ";
+		SetConsoleTextAttribute(hConsole, 10);
+		cout << "\n\nRegistration successful." << endl;
+		SetConsoleTextAttribute(hConsole, 7);
+		cout << "\nWould you like to login [Y/N]? >> ";
 		char c;
 		cin >> c;
 		if (tolower(c) == 'y') {
+			ClearScreen();
 			custLogin();
-		}else
+		}
+		else {
+			cout << endl;
+			system("pause");
+			ClearScreen();
 			return;
+		}
+			
 	}
 	else {
-		cout << "Registration unsuccessful" << endl;
-		cout << "Customer username already exists :(" << endl;
+		SetConsoleTextAttribute(hConsole, 4);
+		cout << "\n\nRegistration unsuccessful." << endl;
+		cout << "Customer username already exists :(\n" << endl;
+		SetConsoleTextAttribute(hConsole, 7);
+		system("pause");
+		ClearScreen();
 		return;
 	}
 }
@@ -412,7 +508,7 @@ bool registerCust(string username, string pass) {
 	ofstream out("Customer.txt", ios::app);
 
 	if (!out) {
-		cerr << "Error in opening the file" << endl;
+		cerr << "Error in opening the file." << endl;
 		return false;
 	}
 
@@ -470,7 +566,14 @@ bool checkCustLogin(string username, string pass) {
 void customerMenu() {
 	int choice;
 	do {
+		displayEqualLine();
+		printf("\n%35s %-25s\n", "CUSTOMER MENU", "");
+		displayEqualLine();
+		cout << endl;
 		displayCustMenu();
+		displayEqualLine();
+		cout << endl << endl;
+		
 		choice = read_int();
 		custChoice(choice);
 	} while (choice != 4);
@@ -494,10 +597,19 @@ void custChoice(int choice) {
 
 	case 4:
 		loginUsername = "";
+		SetConsoleTextAttribute(hConsole, 10);
 		cout << "\nYou have been successfuly logged out.\n" << endl;
+		SetConsoleTextAttribute(hConsole, 7);
 		system("pause");
 		ClearScreen();
 		break;
+
+	default:
+		SetConsoleTextAttribute(hConsole, 14);
+		cout << "\nPlease enter choice between [1 - 4]\n" << endl;
+		SetConsoleTextAttribute(hConsole, 7);
+		system("pause");
+		ClearScreen();
 	}
 }
 
@@ -528,17 +640,24 @@ void purchaseItem() {
 
 		do {
 			choice = read_info(productChoice);
+			
+			if (choice == -1) {
+				arrCart.clear();
+				ClearScreen();
+				return;
+			}
 
 			if (choice > i || choice < 1) {
-				cout << "Please enter product within range [0 - " << i << "]" << endl;
+				cout << "\nPlease enter product within range [0 - " << i << "]" << endl << endl;
 			}
 			else {
-				index = choice - 1;
+				index = MinusOne(choice);
 				storedQty = getProductQty(index);
-				storedQty -= getCartQty(index);
+				storedQty = GetMinusTwoVal(storedQty, getCartQty(index));
 
 				if (storedQty < 1) {
-					cout << "Sorry this item has no more stock. Please try again later." << endl;
+					cout << "\nSorry this item has no more stock. Please try again later.\n" << endl;
+					system("pause");
 					purchaseItem();
 					break;
 				}
@@ -554,11 +673,14 @@ void purchaseItem() {
 			qty = read_info(productQty);
 
 			if (qty > storedQty) {
-				cout << "Please enter quantity that is available (Stock count: " << storedQty << ")" << endl;
+				SetConsoleTextAttribute(hConsole, 4);
+				cout << "\nPlease enter quantity that is available (Stock count: " << storedQty << ")\n" << endl;
+				SetConsoleTextAttribute(hConsole, 7);
 			}
 			else if (qty < 1) {
-				cout << "Please enter quantity more than 0." << endl;
+				cout << "\nPlease enter quantity more than 0.\n" << endl;
 			}
+
 		} while (qty < 1 || qty > storedQty);
 
 		CalculateItemTotal(arrProd.at(index).price, (double)qty);
@@ -569,14 +691,22 @@ void purchaseItem() {
 
 		addToCart(arrProd.at(index).id, arrProd.at(index).name, qty, arrProd.at(index).price, itemTotal);
 			
-		cout << "\nDo you want to purchase more item(s)? [Y/N] >> ";
-		cin >> c;
-			
-		if (c != 'y') {
-			findSubTotal();
-			cout << setprecision(3);
-			CalculateTotal(totalAllItems);
-		}
+		do {
+			cout << "\nDo you want to purchase more item(s)? [Y/N] >> ";
+			cin >> c;
+
+			if (tolower(c) != 'y' && tolower(c) != 'n') {
+				SetConsoleTextAttribute(hConsole, 14);
+				cout << "\nPlease enter either [Y (Yes) / N (No)]" << endl;
+				SetConsoleTextAttribute(hConsole, 7);
+			}
+
+			if (c == 'n') {
+				findSubTotal();
+				cout << setprecision(3);
+				CalculateTotal(totalAllItems);
+			}
+		} while (tolower(c) != 'y' && tolower(c) != 'n');
 
 	} while (tolower(c) == 'y');
 }
@@ -610,14 +740,7 @@ void purchaseHistory() {
 			counter++;
 
 			if (counter == 1) {
-				ClearScreen();
-				displayEqualLine();
-				printf("\n%35s %-25s\n", "PURCHASE HISTORY", "");
-				displayEqualLine();
-				cout << endl;
-				printf("%-18s %-5s %-18s %-18s\n", "Name", "Qty", "Unit Price (RM)", "Total Price (RM)");
-				printDashLine();
-				cout << endl;
+				displayPhHeaders();
 			}
 
 			cout << setw(20) << left << getProductName(ph.id) << setw(9) << left << ph.qty
@@ -625,13 +748,29 @@ void purchaseHistory() {
 		}
 	}
 
-	cout << endl;
-	printDashLine();
-	cout << endl;
-
 	if (counter == 0) {
-		//no orders for this guy
+		displayPhHeaders();
+		SetConsoleTextAttribute(hConsole, 14);
+		cout << "You don't have any purchases." << endl;
+		SetConsoleTextAttribute(hConsole, 7);
 	}
+
+	displayEqualLine();
+	cout << "==============================\n" << endl;
+
+	system("pause");
+	ClearScreen();
+}
+
+void displayPhHeaders() {
+	ClearScreen();
+	displayEqualLine();
+	printf("==============================\n%55s %-25s\n", "PURCHASE HISTORY", "");
+	displayEqualLine();
+	cout << "==============================" << endl;
+	printf("%-18s %-5s %-25s %-20s %-20s\n", "Name", "Qty", "Total Payment (RM)", "Order Date", "Payment Method");
+	printDashLine();
+	cout << "------------------------------" << endl;
 }
 
 string getProductName(int id) {
@@ -724,7 +863,9 @@ void DisplayPaymentCart(double sst, double sch, double total) {
 		cout << "\nProceed with payment? [Y/N] >> ";
 		cin >> c;
 		if (tolower(c) != 'y' && tolower(c) != 'n') {
-			cout << "Please enter either [Y (Yes) / N (No)]" << endl;
+			SetConsoleTextAttribute(hConsole, 14);
+			cout << "\nPlease enter either [Y (Yes) / N (No)]" << endl;
+			SetConsoleTextAttribute(hConsole, 7);
 		}
 	} while (tolower(c) != 'y' && tolower(c) != 'n');
 
@@ -732,8 +873,12 @@ void DisplayPaymentCart(double sst, double sch, double total) {
 		displayPaymentOptions();
 	}
 	else {
-		cout << "Purchase cancelled :(" << endl;
+		SetConsoleTextAttribute(hConsole, 14);
+		cout << "\nPurchase cancelled :(\n" << endl;
+		SetConsoleTextAttribute(hConsole, 7);
 		arrCart.clear();
+		system("pause");
+		ClearScreen();
 		customerMenu();
 	}
 }
@@ -759,7 +904,9 @@ void displayPaymentOptions() {
 		option = read_int_no_cout();
 
 		if (option != 1 && option != 2) {
-			cerr << "Please input between option [1 - 2]\n\n";
+			SetConsoleTextAttribute(hConsole, 14);
+			cerr << "\nPlease input between option [1 - 2]\n\n";
+			SetConsoleTextAttribute(hConsole, 7);
 		}
 	} while (option != 1 && option != 2);
 
@@ -897,8 +1044,7 @@ void updateQty(int mId, int mQty) {
 	for (Products p : arrProd) {
 		++i;
 		if (mId == p.id) {
-			//DO IT IN ASSEMBLY
-			p.qty = p.qty - mQty;
+			p.qty = GetMinusTwoVal(p.qty, mQty);
 			arrProd.at(i).qty = p.qty;
 		}
 	}
@@ -982,7 +1128,9 @@ void displayCart() {
 	cout << endl;
 
 	if (arrCart.size() == 0) {
+		SetConsoleTextAttribute(hConsole, 14);
 		cout << "Cart is empty." << endl;
+		SetConsoleTextAttribute(hConsole, 7);
 	}
 	else {
 		findSubTotal();
@@ -1057,47 +1205,122 @@ void displayProducts(int &i) {
 }
 
 void displayCustMenu() {
-	cout << "Customer" << endl;
 	cout << "1. Purchase Item\n2. Purchase History\n3. Change Password\n4. Logout" << endl;
 }
 
 void changePassword() {
+	ClearScreen();
+
+	displayEqualLine();
+	
+	printf("\n%35s %-25s\n", "CHANGE PASSWORD", "");
+	displayEqualLine();
+	cout << endl;
+
 	string currPass, pass, pass2;
+	char keypressed;
 
 	if (loginUsername.length() == 0) {
 		custDisplayLogin();
 	}
 
-	cout << "Change Password for " << loginUsername << endl;
-	cout << "Enter current password: ";
-	cin >> currPass;
+	//cout << "Change Password for " << loginUsername << endl;
+	cout << "Enter current password >> ";
+	currPass = "";
+
+	for (;;) {
+		keypressed = NULL;
+		keypressed = _getch();
+
+		if (currPass.size() < MAX_LENGTH && ((keypressed >= 60 && keypressed <= 90) || (keypressed >= 97 && keypressed <= 122) || (keypressed >= 48 && keypressed <= 57) || keypressed == 32)) {
+			currPass.push_back(keypressed);
+			cout << "*";
+		}
+
+		else if (currPass.size() > 0 && keypressed == 8) {
+			currPass.erase(MinusOne(currPass.length()));
+			cout << "\b \b";
+		}
+
+		else if (keypressed == 13)
+			break;
+	}
 
 	if (checkCustLogin(loginUsername, currPass)) {
 		
 		do {
+			cout << "\n\nEnter new password >> ";
+			pass = "";
 
-			cout << "Enter new password: ";
-			cin >> pass;
+			for (;;) {
+				keypressed = NULL;
+				keypressed = _getch();
+
+				if (pass.size() < MAX_LENGTH && ((keypressed >= 60 && keypressed <= 90) || (keypressed >= 97 && keypressed <= 122) || (keypressed >= 48 && keypressed <= 57) || keypressed == 32)) {
+					pass.push_back(keypressed);
+					cout << "*";
+				}
+
+				else if (pass.size() > 0 && keypressed == 8) {
+					pass.erase(MinusOne(pass.length()));
+					cout << "\b \b";
+				}
+
+				else if (keypressed == 13)
+					break;
+			}
 
 			if (pass.length() < 4) {
-				cerr << "Password must be more than 3 characters." << endl;
+				SetConsoleTextAttribute(hConsole, 4);
+				cerr << "\n\nPassword must be more than 3 characters.";
+				SetConsoleTextAttribute(hConsole, 7);
 			}
 
 		} while (pass.length() < 4);
 
-		cout << "Re-enter new password: ";
-		cin >> pass2;
+		cout << "\nRe-enter new password >> ";
+		pass2 = "";
+
+		for (;;) {
+			keypressed = NULL;
+			keypressed = _getch();
+
+			if (pass2.size() < MAX_LENGTH && ((keypressed >= 60 && keypressed <= 90) || (keypressed >= 97 && keypressed <= 122) || (keypressed >= 48 && keypressed <= 57) || keypressed == 32)) {
+				pass2.push_back(keypressed);
+				cout << "*";
+			}
+
+			else if (pass2.size() > 0 && keypressed == 8) {
+				pass2.erase(MinusOne(pass2.length()));
+				cout << "\b \b";
+			}
+
+			else if (keypressed == 13)
+				break;
+		}
 
 		if (pass.compare(pass2) == 0) {
 			saveNewPassword(currPass, pass);
-			cout << "Password has been successfully changed :)" << endl;
+			SetConsoleTextAttribute(hConsole, 10);
+			cout << "\n\nPassword has been successfully changed :)\n" << endl;
+			SetConsoleTextAttribute(hConsole, 7);
+			system("pause");
+			ClearScreen();
 		}
 		else {
-			cerr << "Passwords don't match. Please try again." << endl;
+			SetConsoleTextAttribute(hConsole, 4);
+			cerr << "\n\nPasswords don't match. Please try again.\n" << endl;
+			SetConsoleTextAttribute(hConsole, 7);
+			system("pause");
+			ClearScreen();
 		}
 	}
 	else {
-		cerr << "Incorrect current password." << endl;
+		SetConsoleTextAttribute(hConsole, 4);
+		cerr << "\nIncorrect current password.\n" << endl;
+		SetConsoleTextAttribute(hConsole, 7);
+		system("pause");
+		ClearScreen();
 	}
 }
 
@@ -1145,7 +1368,7 @@ void adminMenu() {
 }
 
 void displayLogin() {
-	cout << "Login" << endl;
+	//cout << "Login" << endl;
 	cout << "1. Customer\n2. Admin\n3. Exit" << endl;
 }
 
@@ -1155,7 +1378,7 @@ int read_int(){
 
 	do
 	{
-		cout << "Enter your choice: " << flush;
+		cout << "Enter your choice >> " << flush;
 		cin >> input;
 		if (cin.good()){
 			valid = true;
@@ -1163,8 +1386,10 @@ int read_int(){
 		else{
 			cin.clear();
 			cin.ignore((numeric_limits<streamsize>::max)(), '\n');
-			cout << "Invalid input; please re-enter choice.\n" << endl;
-			//Tell them to enter integer only
+
+			SetConsoleTextAttribute(hConsole, 4);
+			cout << "Invalid input; Please enter an integer.\n" << endl;
+			SetConsoleTextAttribute(hConsole, 7);
 		}
 	} while (!valid);
 
@@ -1184,7 +1409,7 @@ int read_int_no_cout() {
 		else {
 			cin.clear();
 			cin.ignore((numeric_limits<streamsize>::max)(), '\n');
-			cout << "Please input integer only.\n" << endl;
+			cout << "\nPlease input integer only.\n" << endl;
 			cout << "Enter your payment option >> ";
 		}
 	} while (!valid);
@@ -1206,7 +1431,9 @@ int read_info(string outputText) {
 		else {
 			cin.clear();
 			cin.ignore((numeric_limits<streamsize>::max)(), '\n');
-			cout << "Invalid input; please re-enter choice.\n" << endl;
+			SetConsoleTextAttribute(hConsole, 4);
+			cout << "Invalid input; Please enter an integer.\n" << endl;
+			SetConsoleTextAttribute(hConsole, 7);
 		}
 	} while (!valid);
 
