@@ -114,4 +114,22 @@ CalculateTotal PROC C subTotal:REAL8
 	ret
 CalculateTotal ENDP
 
+MinusOne PROC C intVal:dword
+	xor eax, eax
+
+	mov eax, intVal
+	sub eax, 1
+
+	ret
+MinusOne ENDP
+
+GetMinusTwoVal PROC C val1:dword, val2:dword
+	xor eax, eax
+
+	mov eax, val1
+	sub eax, val2
+
+	ret
+GetMinusTwoVal ENDP
+
 END
